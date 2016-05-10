@@ -14,7 +14,11 @@ public:
     Vector dir;
 
     int anzKugeln;
+    int maxRand;
+
     bool verhakt[2]; // immer gleich anzKugeln
+
+    bool randVerhakt[4];
 };
 
 #endif // KUGEL_H

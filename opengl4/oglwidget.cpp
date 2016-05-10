@@ -35,7 +35,6 @@ void drawGround(float x, float y, float y2, float z, float z2)
 {
     glBegin(GL_QUADS);
 
-
         glVertex3f(x,y,z);
         glVertex3f(-x,y,z);
 
@@ -210,6 +209,8 @@ void OGLWidget::initializeGL()
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_COLOR_MATERIAL);
     glEnable(GL_LIGHT0);
+
+    /*
     glEnable(GL_LIGHT1);
     glEnable(GL_LIGHT2);
 
@@ -218,6 +219,27 @@ void OGLWidget::initializeGL()
 
     // For wireframe replace GL_FILL with GL_LINE
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+    */
+
+    GLfloat light1_ambient[] = { 0.2, 0.2, 0.2, 1.0 };
+    GLfloat light1_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light1_specular[] = { 1.0, 1.0, 1.0, 1.0 };
+    GLfloat light1_position[] = { -2.0, 2.0, 1.0, 1.0 };
+    GLfloat spot_direction[] = { -1.0, -1.0, 0.0 };
+
+    glLightfv(GL_LIGHT1, GL_AMBIENT, light1_ambient);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, light1_diffuse);
+    glLightfv(GL_LIGHT1, GL_SPECULAR, light1_specular);
+    glLightfv(GL_LIGHT1, GL_POSITION, light1_position);
+    glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, 1.5);
+    glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, 0.5);
+    glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, 0.2);
+
+    glLightf(GL_LIGHT1, GL_SPOT_CUTOFF, 45.0);
+    glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, spot_direction);
+    glLightf(GL_LIGHT1, GL_SPOT_EXPONENT, 2.0);
+
+    glEnable(GL_LIGHT1);
 }
 
 void OGLWidget::paintGL()
@@ -226,8 +248,6 @@ void OGLWidget::paintGL()
 
     glLoadIdentity();
     glOrtho(-10,10,-10,10, -100,100);
-
-    glTranslatef(0,0,10);
 
     glPushMatrix();
     glColor3f(1,1,1);
@@ -244,29 +264,30 @@ void OGLWidget::paintGL()
 
 
     //Bänder Zeichnen
-    float size = 9;
+    float sizex = 10;
+    float sizey = 20;
     float height = 5;
     float height2 = height+2;
 
-    drawQuad(size,size, height2, false);
-    drawQuad(size,-size,height2, false);
-    drawQuad(size,size,height2, true);
-    drawQuad(-size,size,height2, true);
+    drawQuad(sizex,sizey, height2, false);
+    drawQuad(sizex,-sizey,height2, false);
+    drawQuad(sizex,sizey,height2, true);
+    drawQuad(-sizex,sizey,height2, true);
 
 
     //Boden zeichnen
     //Anfang und Ende der schiefen Ebene
-    float anfang = size/3; //Bord soll gedrittelt werden
-    float ende = -size/3;
+    float anfang = sizey/3; //Bord soll gedrittelt werden
+    float ende = -sizey/3;
 
     glColor3f(0,1,0);
-    drawGround(size, size, anfang, 0, 0);
+    drawGround(sizex, sizey, anfang, 0, 0);
 
     glColor3f(1,1,0);
-    drawGround(size, anfang, ende, 0, height);
+    drawGround(sizex, anfang, ende, 0, height);
 
     glColor3f(0,1,1);
-    drawGround(size, ende, -size, height, height);
+    drawGround(sizex, ende, -sizey, height, height);
 
 
     const float speed = 0.001;
@@ -275,6 +296,7 @@ void OGLWidget::paintGL()
 
     //Kugel Objects
     int anzKugeln = 2;
+    float maxDir = 0.5;
 
     //Erste Kugel
     glPushMatrix();
@@ -286,6 +308,24 @@ void OGLWidget::paintGL()
         {
             kugel[0].dir.x = (float)(uppos.x() - lastpos.x()) * speed;
             kugel[0].dir.y = -(uppos.y() - lastpos.y()) * speed;
+
+            if(kugel[0].dir.y >= maxDir)
+            {
+                kugel[0].dir.y = maxDir;
+            }
+            if(kugel[0].dir.x >= maxDir)
+            {
+                kugel[0].dir.x = maxDir;
+            }
+            if(kugel[0].dir.y < -maxDir)
+            {
+                kugel[0].dir.y = -maxDir;
+            }
+            if(kugel[0].dir.x < -maxDir)
+            {
+                kugel[0].dir.x = -maxDir;
+            }
+
 
             uppos.setX(0);
             uppos.setY(0);
@@ -330,13 +370,43 @@ void OGLWidget::paintGL()
     //Kollisionsüberprüfung Rand
     for(int i = 0; i < anzKugeln; i++)
     {
-        if(kugel[i].pos.x-radius <= -size || kugel[i].pos.x +radius>= size)
+        if(kugel[i].pos.x-radius <= -sizex && kugel[i].randVerhakt[0] == false)
         {
             kugel[i].dir.x = -kugel[i].dir.x;
+            kugel[i].randVerhakt[0] = true;
+        }           
+        if (kugel[i].pos.x +radius>= sizex && kugel[i].randVerhakt[1] == false)
+        {
+            kugel[i].dir.x = -kugel[i].dir.x;
+            kugel[i].randVerhakt[1] = true;
         }
-        else if(kugel[i].pos.y-radius <= -size || kugel[i].pos.y+radius >= size)
+        if(kugel[i].pos.y-radius <= -sizey && kugel[i].randVerhakt[2] == false)
         {
             kugel[i].dir.y = -kugel[i].dir.y;
+            kugel[i].randVerhakt[2] = true;
+        }
+        if (kugel[i].pos.y+radius >= sizey && kugel[i].randVerhakt[3] == false)
+        {
+            kugel[i].dir.y = -kugel[i].dir.y;
+            kugel[i].randVerhakt[3] = true;
+        }
+
+        //enthaken
+        if(kugel[i].pos.x-radius > -sizex)
+        {
+            kugel[i].randVerhakt[0] = false;
+        }
+        if (kugel[i].pos.x +radius < sizex)
+        {
+            kugel[i].randVerhakt[1] = false;
+        }
+        if(kugel[i].pos.y-radius > -sizey)
+        {
+            kugel[i].randVerhakt[2] = false;
+        }
+        if (kugel[i].pos.y+radius < sizey)
+        {
+            kugel[i].randVerhakt[3] = false;
         }
     }
 
@@ -360,7 +430,7 @@ void OGLWidget::paintGL()
                     Vector VX = kugel[i].dir;
                     Vector VY = kugel[j].dir;
 
-                    Vector S = 0.5f * (X-Y) ;
+                    //Vector S = 0.5f * (X-Y) ;
                     Vector VS = 0.5f *(VX+VY);
 
                     Vector VX1 = VX-VS;
@@ -369,7 +439,7 @@ void OGLWidget::paintGL()
                     Vector VX2 = 2.0f * ((a*VX1) / norm(a)*norm(a)) * a;
                     Vector VY2 = 2.0f * ((a*VY1) / norm(a)*norm(a)) * a;
 
-                    float impulserhaltung = -0.15;//-0.15;
+                    float impulserhaltung = -0.18;//-0.15;
                     kugel[i].dir = (VX2+VS) * impulserhaltung;
                     kugel[j].dir = (VY2+VS) * impulserhaltung;
 
@@ -388,7 +458,6 @@ void OGLWidget::paintGL()
         //reibung#
         reibung(kugel[j].dir, kugel[j].pos, anfang, ende);
     }
-
 
     glPopMatrix();
     update();

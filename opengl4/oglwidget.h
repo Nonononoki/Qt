@@ -1,7 +1,9 @@
 #ifndef OGLWIDGET_H
 #define OGLWIDGET_H
 
+#include "zylinder.h"
 #include "kugel.h"
+#include "schraege.h"
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
 #include <QMouseEvent>
@@ -29,12 +31,6 @@ public slots:
     // Set zoom factor
     void setZoom( int newzoom );
 
-    void setX( float newx );
-    void setY( float newy );
-
-    void cross(Vector a, Vector b);
-
-
 protected:
     void initializeGL();
     void resizeGL(int w, int h);
@@ -46,10 +42,25 @@ protected:
     int rotz;
     int zoom;       // Zoom factor (0..200, 100 for 1:1)
 
+    float sizex = 10;
+    float sizey = 20;
+    float height = 2;
+    float height2 = height+1;
+
     QPoint lastpos; // Last position of mouse pressed, used for dragging
     QPoint uppos;
 
-    Kugel kugel[2]; //immer gleich anzKugeln
+    int anzKugeln;
+    int anzZylinder;
+    int anzSchraege;
+
+    Kugel kugel[13]; //immer gleich anzKugeln
+    Vector start[13]; //Startpositionen der Kugel
+
+    Zylinder zylinder[6];
+    Schraege schraege[2];
+
+
 };
 
 

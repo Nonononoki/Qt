@@ -4,7 +4,7 @@
 
 Kugel::Kugel()
 {
-    anzKugeln = 2;
+    anzKugeln = 13;
     maxRand = 4;
 
     for(int i = 0; i < anzKugeln; i++)

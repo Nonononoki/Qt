@@ -1,7 +1,6 @@
 #include "oglwidget.h"
 #include <QDebug>
 #include <cmath>
-#include "kugel.h"
 
 void drawQuad(float x, float y, float z, bool senktrecht)
 {
@@ -45,7 +44,6 @@ void drawGround(float x, float y, float y2, float z, float z2)
 
     glEnd();
 }
-
 
 float kugelHoehe(float a, float b, float hoehe, float y) //Start und Ende der schiefen Ebene
 {
@@ -119,19 +117,101 @@ void drawKugel(float radius, float x, float y, float z)
     glEnd();
 }
 
+void drawZylinder( float rad, float v)
+{
+    int n = 30; int arg = 0;
+
+    // DumbProof Double Check :)
+        if (arg < 0)
+            arg = 0;
+
+        // Cylinder Bottom
+        glBegin(GL_POLYGON);
+            glColor4f(0.0, 0.0, 0.0, 1.0);
+            for(int i = arg; i <= (360 + arg); i += (360 / n)) {
+                float a = i * M_PI / 180; // degrees to radians
+                glVertex3f(rad * cos(a), rad * sin(a), 0.0);
+            }
+        glEnd();
+
+        // Cylinder Top
+        glBegin(GL_POLYGON);
+            glColor4f(0.0, 0.0, 0.0, 1.0);
+            for(int i = arg; i <= (360 + arg); i += (360 / n)) {
+                float a = i * M_PI / 180; // degrees to radians
+                glVertex3f(rad * cos(a), rad * sin(a), v);
+            }
+        glEnd();
+
+        // Cylinder "Cover"
+        glBegin(GL_QUAD_STRIP);
+            glColor4f(0.0, 0.0, 0.0, 1.0);
+            for(int i = arg; i < 480; i += (360 / n)) {
+                float a = i * M_PI / 180; // degrees to radians
+                glVertex3f(rad * cos(a), rad * sin(a), 0.0);
+                glVertex3f(rad * cos(a), rad * sin(a), v);
+            }
+        glEnd();
+
+}
+
 OGLWidget::OGLWidget(QWidget *parent)
     : QOpenGLWidget(parent)
 {
+    anzKugeln = 13;
+    anzZylinder = 6;
+    anzSchraege = 2;
+
     rotx = 0;
     roty = 0;
     rotz = 0;
     zoom = 100;
+
+    //Bänder Zeichnen
+    sizex = 10;
+    sizey = 20;
+    height = 2;
+    height2 = height+1; //höhe der Bänder
+
+    //Startpositionen
+    start[0] = Vector(0,0,0);
+    start[1] = Vector(0,18,0);
+    start[2] = Vector(-2,16,0);
+    start[3] = Vector(2,16,0);
+    start[4] = Vector(0,14,0);
+    start[5] = Vector(4,14,0);
+    start[6] = Vector(-4,14,0);
+
+    start[7] = start[1] * -1;
+    start[8] = start[2] * -1;
+    start[9] = start[3] * -1;
+    start[10] = start[4] * -1;
+    start[11] = start[5] * -1;
+    start[12] = start[6] * -1;
+
+    for(int i = 0; i < anzKugeln; i++)
+    {
+        kugel[i].pos = start[i];
+    }
+
+    schraege[0] = Schraege();
+    schraege[1] = Schraege();
+
+    //Zylindervariablen
+    float zhoehe = height2;
+    float zradius = 1;
+
+    zylinder[0] = Zylinder(Vector(sizex,0,0), zradius,zhoehe);
+    zylinder[1] = Zylinder(Vector(-sizex,0,0), zradius,zhoehe);
+    zylinder[2] = Zylinder(Vector(sizex,sizey,0), zradius,zhoehe);
+    zylinder[3] = Zylinder(Vector(-sizex,sizey,0), zradius,zhoehe);
+    zylinder[4] = Zylinder(Vector(sizex,-sizey,0), zradius,zhoehe);
+    zylinder[5] = Zylinder(Vector(-sizex,-sizey,0), zradius,zhoehe);
 }
 
 OGLWidget::~OGLWidget()
 {
 }
-
 
 void OGLWidget::setRotX(int newrx)
 {
@@ -157,18 +237,6 @@ void OGLWidget::setZoom(int newzoom)
     update();
 }
 
-Vector cross(Vector a, Vector b)
-{
-    return Vector ( a.y*b.z - a.z*b.y,
-                    a.z*b.x - a.x*b.z,
-                    a.x*b.y - a.y*b.x  );
-}
-
-float norm(Vector a)
-{
-    return sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
-}
-
 float betrag(float a)
 {
     if(a < 0) a = -a;
@@ -180,11 +248,23 @@ void reibung(Vector &dir, Vector pos, float anfang, float ende)
 {
     //Keine Reibung wenn an der Schräge!
 
-    //qDebug() << pos.y;
     if(pos.y < ende || pos.y > anfang)
     {
-        float b = 0.995f;
-        dir = dir * b;
+        float a = 0.05f; //Grenze zur stärkeren Reibung
+
+        float b = 0.99f; //Reibungsfaktor schnell
+        float c = 0.9; //Reibungsfaktor langsam
+
+        if(betrag(dir.x) > a)
+            dir.x = dir.x * b;
+        else
+            dir.x = dir.x * c;
+
+        if(betrag(dir.y) > a)
+            dir.y = dir.y * b;
+        else
+            dir.y = dir.y * c;
+
 
         float margin = 0.01f;
         if(betrag(dir.x) <= margin)
@@ -198,7 +278,6 @@ void reibung(Vector &dir, Vector pos, float anfang, float ende)
         }
     }
 }
-
 
 void OGLWidget::initializeGL()
 {
@@ -247,7 +326,7 @@ void OGLWidget::paintGL()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glLoadIdentity();
-    glOrtho(-10,10,-10,10, -100,100);
+    glOrtho(-10,10,-20,20, -100,100);
 
     glPushMatrix();
     glColor3f(1,1,1);
@@ -262,165 +341,93 @@ void OGLWidget::paintGL()
     float scale = zoom/100.0;
     glScalef( scale, scale, scale ); // Scale along all axis
 
-
-    //Bänder Zeichnen
-    float sizex = 10;
-    float sizey = 20;
-    float height = 5;
-    float height2 = height+2;
-
+    //Zeichen Bänder
     drawQuad(sizex,sizey, height2, false);
     drawQuad(sizex,-sizey,height2, false);
     drawQuad(sizex,sizey,height2, true);
     drawQuad(-sizex,sizey,height2, true);
 
-
     //Boden zeichnen
     //Anfang und Ende der schiefen Ebene
-    float anfang = sizey/3; //Bord soll gedrittelt werden
-    float ende = -sizey/3;
+    float anfang1 = sizey/5; //Bord soll gefüntelt werden
+    float ende1 = -sizey/5;
 
     glColor3f(0,1,0);
-    drawGround(sizex, sizey, anfang, 0, 0);
+    drawGround(sizex, sizey, anfang1, 0, 0);
 
     glColor3f(1,1,0);
-    drawGround(sizex, anfang, ende, 0, height);
+    drawGround(sizex, anfang1, ende1, 0, height);
 
     glColor3f(0,1,1);
-    drawGround(sizex, ende, -sizey, height, height);
+    drawGround(sizex, ende1, -sizey, height, height);
 
+    for(int i = 0; i < anzZylinder; i++)
+    {
+        glPushMatrix();
 
-    const float speed = 0.001;
-    const float ebenenKonst = 0.01;
+        glTranslatef(zylinder[i].pos.x, zylinder[i].pos.y, zylinder[i].pos.z);
+
+        drawZylinder(zylinder[i].radius, zylinder[i].hoehe);
+
+        glPopMatrix();
+
+    }
+
+    const float speed = 0.001 * 1.5f;
+    //const float ebenenKonst = 0.01;
     float radius = 1;
 
     //Kugel Objects
-    int anzKugeln = 2;
-    float maxDir = 0.5;
-
-    //Erste Kugel
-    glPushMatrix();
-
-        glColor3f(1,0,0);
-
-        //calculate direction
-        if(uppos.x() != 0 && uppos.y() != 0)
-        {
-            kugel[0].dir.x = (float)(uppos.x() - lastpos.x()) * speed;
-            kugel[0].dir.y = -(uppos.y() - lastpos.y()) * speed;
-
-            if(kugel[0].dir.y >= maxDir)
-            {
-                kugel[0].dir.y = maxDir;
-            }
-            if(kugel[0].dir.x >= maxDir)
-            {
-                kugel[0].dir.x = maxDir;
-            }
-            if(kugel[0].dir.y < -maxDir)
-            {
-                kugel[0].dir.y = -maxDir;
-            }
-            if(kugel[0].dir.x < -maxDir)
-            {
-                kugel[0].dir.x = -maxDir;
-            }
-
-
-            uppos.setX(0);
-            uppos.setY(0);
-        }
-
-        //Geschwindigkeitsänderung in der schiefen Ebene
-        if(kugel[0].pos.y < anfang && kugel[0].pos.y > ende)
-        {
-            kugel[0].dir.y += ebenenKonst;
-        }     
-
-        kugel[0].pos.x += kugel[0].dir.x;
-        kugel[0].pos.y += kugel[0].dir.y;
-        kugel[0].pos.z =  kugelHoehe(anfang, ende, height, kugel[0].pos.y) + radius;
-
-        drawKugel(radius,kugel[0].pos.x,kugel[0].pos.y,kugel[0].pos.z);
-
-    glPopMatrix();
-
-    for(int i = 1; i < anzKugeln; i++)
+    for(int i = 0; i < anzKugeln; i++)
     {
-        //zweite Kugel und auch weitere
         glPushMatrix();
 
-            glColor3f(0,0,1);
+            if(i == 0)
+                glColor3f(0,0,1);
+            else
+                glColor3f(1,0,0);
 
-            //Geschwindigkeitsänderung in der schiefen Ebene
-            if(kugel[i].pos.y < anfang && kugel[i].pos.y > ende)
+            if( i == 0 && uppos.x() != 0 && uppos.y() != 0)
             {
-                kugel[i].dir.y += ebenenKonst;
+                kugel[i].dir.x = (float)(uppos.x() - lastpos.x()) * speed;
+                kugel[i].dir.y = -(uppos.y() - lastpos.y()) * speed;
+
+                uppos.setX(0);
+                uppos.setY(0);
+            }
+
+
+            //Schräge
+            for(int j = 0; j < anzSchraege; j++)
+            {
+                if(kugel[i].pos.y < schraege[j].anfang && kugel[i].pos.y > schraege[j].ende)
+                {
+                    kugel[i].dir.y += schraege[j].sconst;
+                }
             }
 
             kugel[i].pos.x += kugel[i].dir.x;
             kugel[i].pos.y += kugel[i].dir.y;
-            kugel[i].pos.z = kugelHoehe(anfang, ende, height, kugel[i].pos.y) + radius;
+            kugel[i].pos.z = kugelHoehe(anfang1, ende1, height, kugel[i].pos.y) + radius;
 
             drawKugel(radius,kugel[i].pos.x,kugel[i].pos.y,kugel[i].pos.z);
 
         glPopMatrix();
     }
 
-    //Kollisionsüberprüfung Rand
-    for(int i = 0; i < anzKugeln; i++)
-    {
-        if(kugel[i].pos.x-radius <= -sizex && kugel[i].randVerhakt[0] == false)
-        {
-            kugel[i].dir.x = -kugel[i].dir.x;
-            kugel[i].randVerhakt[0] = true;
-        }           
-        if (kugel[i].pos.x +radius>= sizex && kugel[i].randVerhakt[1] == false)
-        {
-            kugel[i].dir.x = -kugel[i].dir.x;
-            kugel[i].randVerhakt[1] = true;
-        }
-        if(kugel[i].pos.y-radius <= -sizey && kugel[i].randVerhakt[2] == false)
-        {
-            kugel[i].dir.y = -kugel[i].dir.y;
-            kugel[i].randVerhakt[2] = true;
-        }
-        if (kugel[i].pos.y+radius >= sizey && kugel[i].randVerhakt[3] == false)
-        {
-            kugel[i].dir.y = -kugel[i].dir.y;
-            kugel[i].randVerhakt[3] = true;
-        }
-
-        //enthaken
-        if(kugel[i].pos.x-radius > -sizex)
-        {
-            kugel[i].randVerhakt[0] = false;
-        }
-        if (kugel[i].pos.x +radius < sizex)
-        {
-            kugel[i].randVerhakt[1] = false;
-        }
-        if(kugel[i].pos.y-radius > -sizey)
-        {
-            kugel[i].randVerhakt[2] = false;
-        }
-        if (kugel[i].pos.y+radius < sizey)
-        {
-            kugel[i].randVerhakt[3] = false;
-        }
-    }
-
+    //Kollision der Kugel
     for(int j = 0; j < anzKugeln; j++)
     {
         for(int i = 0; i < anzKugeln; i++)
         {
             //float abstand = sqrt((x-x2)*(x-x2) + (y-y2)*(y-y2));
             float abstand = sqrt(pow(kugel[i].pos.x-kugel[j].pos.x,2) + pow(kugel[i].pos.y-kugel[j].pos.y,2));
+            float margin = 0.01f; //Damit die Kugeln nicht ineinander gehen, margin error
 
             if(i != j)
             {
                 //Kollision der Kugeln
-                if(abstand <= radius*2 && kugel[i].verhakt[j] == false)
+                if(abstand <= radius*2 + margin && kugel[i].verhakt[j] == false)
                 {
                     //do something
 
@@ -436,12 +443,16 @@ void OGLWidget::paintGL()
                     Vector VX1 = VX-VS;
                     Vector VY1 = VY-VS;
 
-                    Vector VX2 = 2.0f * ((a*VX1) / norm(a)*norm(a)) * a;
-                    Vector VY2 = 2.0f * ((a*VY1) / norm(a)*norm(a)) * a;
+                    Vector VX2 = 2.0f * ((a*VX1) / a.norm()*a.norm()) * a;
+                    Vector VY2 = 2.0f * ((a*VY1) / a.norm()*a.norm()) * a;                 
 
-                    float impulserhaltung = -0.18;//-0.15;
+                    const float impulserhaltung = -0.185;
                     kugel[i].dir = (VX2+VS) * impulserhaltung;
                     kugel[j].dir = (VY2+VS) * impulserhaltung;
+
+                    //Tausche Geschwindigkeiten
+                    //kugel[i].dir = kugel[i].dir * kugel[j].dir.norm();
+                    //kugel[j].dir = kugel[j].dir * kugel[i].dir.norm();
 
                     kugel[i].verhakt[j] = true;
                     kugel[j].verhakt[i] = true;
@@ -455,11 +466,58 @@ void OGLWidget::paintGL()
             }
         }
 
+        //Kollisionsüberprüfung Rand
+        for(int i = 0; i < anzKugeln; i++)
+        {
+            if(kugel[i].pos.x-radius <= -sizex && kugel[i].randVerhakt[0] == false)
+            {
+                kugel[i].dir.x = -kugel[i].dir.x;
+                kugel[i].randVerhakt[0] = true;
+            }
+            if (kugel[i].pos.x +radius>= sizex && kugel[i].randVerhakt[1] == false)
+            {
+                kugel[i].dir.x = -kugel[i].dir.x;
+                kugel[i].randVerhakt[1] = true;
+            }
+            if(kugel[i].pos.y-radius <= -sizey && kugel[i].randVerhakt[2] == false)
+            {
+                kugel[i].dir.y = -kugel[i].dir.y;
+                kugel[i].randVerhakt[2] = true;
+            }
+            if (kugel[i].pos.y+radius >= sizey && kugel[i].randVerhakt[3] == false)
+            {
+                kugel[i].dir.y = -kugel[i].dir.y;
+                kugel[i].randVerhakt[3] = true;
+            }
+
+            //enthaken
+            if(kugel[i].pos.x-radius > -sizex)
+            {
+                kugel[i].randVerhakt[0] = false;
+            }
+            if (kugel[i].pos.x +radius < sizex)
+            {
+                kugel[i].randVerhakt[1] = false;
+            }
+            if(kugel[i].pos.y-radius > -sizey)
+            {
+                kugel[i].randVerhakt[2] = false;
+            }
+            if (kugel[i].pos.y+radius < sizey)
+            {
+                kugel[i].randVerhakt[3] = false;
+            }
+        }
+
         //reibung#
-        reibung(kugel[j].dir, kugel[j].pos, anfang, ende);
+        for(int k = 0; k < anzSchraege; k++)
+        {
+            reibung(kugel[j].dir, kugel[j].pos, schraege[k].anfang, schraege[k].ende);
+        }
     }
 
     glPopMatrix();
+
     update();
 
 }

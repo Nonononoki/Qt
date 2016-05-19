@@ -18,11 +18,15 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     oglwidget.cpp \
     kugel.cpp \
-    vector.cpp
+    vector.cpp \
+    zylinder.cpp \
+    schraege.cpp
 
 HEADERS  += mainwindow.h \
     oglwidget.h \
     kugel.h \
-    vector.h
+    vector.h \
+    zylinder.h \
+    schraege.h
 
 FORMS    += mainwindow.ui

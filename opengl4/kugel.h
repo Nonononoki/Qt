@@ -16,7 +16,7 @@ public:
     int anzKugeln;
     int maxRand;
 
-    bool verhakt[2]; // immer gleich anzKugeln
+    bool verhakt[13]; // immer gleich anzKugeln
 
     bool randVerhakt[4];
 };

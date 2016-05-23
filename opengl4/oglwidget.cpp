@@ -45,28 +45,6 @@ void drawGround(float x, float y, float y2, float z, float z2)
     glEnd();
 }
 
-float kugelHoehe(float a, float b, float hoehe, float y) //Start und Ende der schiefen Ebene
-{
-    float z;
-
-    float m = hoehe/ (a-b) * -1;
-
-    if(y >= a)
-    {
-        z = 0;
-    }
-    else if(y < a && y > b)
-    {
-        z = (y+b)*m;
-    }
-    else if(y <= b)
-    {
-        z = hoehe;
-    }
-
-    return z;
-}
-
 void drawKugel(float radius, float x, float y, float z)
 {
     float theta = 0, phi = 0;
@@ -194,8 +172,8 @@ OGLWidget::OGLWidget(QWidget *parent)
         kugel[i].pos = start[i];
     }
 
-    schraege[0] = Schraege();
-    schraege[1] = Schraege();
+    schraege[0] = Schraege(sizey/5*3, sizey/5, 0.015f); //obere Schräge
+    schraege[1] = Schraege(sizey/5*-1, sizey/5*3*-1, -0.015f); //untere schräge
 
     //Zylindervariablen
     float zhoehe = height2;
@@ -250,7 +228,7 @@ void reibung(Vector &dir, Vector pos, float anfang, float ende)
 
     if(pos.y < ende || pos.y > anfang)
     {
-        float a = 0.05f; //Grenze zur stärkeren Reibung
+        float a = 0.02f; //Grenze zur stärkeren Reibung
 
         float b = 0.99f; //Reibungsfaktor schnell
         float c = 0.9; //Reibungsfaktor langsam
@@ -277,6 +255,49 @@ void reibung(Vector &dir, Vector pos, float anfang, float ende)
             dir.y = 0;
         }
     }
+    else
+        qDebug() << "SChräge!";
+}
+
+float kugelHoehe(float y, float hoehe, float sizey, float radius)
+{
+    float z;
+
+    //5 Fälle, oben, schief-oben, mitte, schief-mitte, unten
+
+    float m1 = hoehe/ (sizey/5*3 - sizey/5) * -1;
+    float m2 = hoehe/ (sizey/5*-3 - sizey/-5) * -1;
+
+
+    if(y > sizey/5*3) //oben
+    {
+        z = 0;
+    }
+    else if(y < sizey/5*-3) //unten
+    {
+        z = 0;
+    }
+    else if(y > sizey/-5 && y < sizey/5) //mittig
+    {
+        z = hoehe;
+    }
+    else if(y > sizey/5 && y < sizey/5*3) //schräge oben
+    {
+        float b = -6*radius*hoehe;
+        z = (y+b)*m1;
+    }
+    else if(y < sizey/5*-1 && y > sizey/5*-3) //schräge unten
+    {
+        float b = 6*radius*hoehe;
+        z = (y+b)*m2;
+    }
+
+    //z = (y+b)*m;
+
+    //qDebug() << z;
+
+    return z;
+
 }
 
 void OGLWidget::initializeGL()
@@ -348,18 +369,23 @@ void OGLWidget::paintGL()
     drawQuad(-sizex,sizey,height2, true);
 
     //Boden zeichnen
-    //Anfang und Ende der schiefen Ebene
-    float anfang1 = sizey/5; //Bord soll gefüntelt werden
-    float ende1 = -sizey/5;
+    float part = sizey/5; //Bord soll gefüntelt werden
 
     glColor3f(0,1,0);
-    drawGround(sizex, sizey, anfang1, 0, 0);
+    drawGround(sizex, 5*part, 3*part, 0, 0);
 
     glColor3f(1,1,0);
-    drawGround(sizex, anfang1, ende1, 0, height);
+    drawGround(sizex, 3*part, 1*part, 0, height);
 
     glColor3f(0,1,1);
-    drawGround(sizex, ende1, -sizey, height, height);
+    drawGround(sizex, 1*part, -1*part, height, height);
+
+    glColor3f(1,1,0);
+    drawGround(sizex, -3*part, -1*part, 0, height);
+
+    glColor3f(0,1,0);
+    drawGround(sizex, -5*part, -3*part, 0, 0);
+
 
     for(int i = 0; i < anzZylinder; i++)
     {
@@ -373,7 +399,7 @@ void OGLWidget::paintGL()
 
     }
 
-    const float speed = 0.001 * 1.5f;
+    const float speed = 0.001 * 1.3f;
     //const float ebenenKonst = 0.01;
     float radius = 1;
 
@@ -396,7 +422,6 @@ void OGLWidget::paintGL()
                 uppos.setY(0);
             }
 
-
             //Schräge
             for(int j = 0; j < anzSchraege; j++)
             {
@@ -408,7 +433,7 @@ void OGLWidget::paintGL()
 
             kugel[i].pos.x += kugel[i].dir.x;
             kugel[i].pos.y += kugel[i].dir.y;
-            kugel[i].pos.z = kugelHoehe(anfang1, ende1, height, kugel[i].pos.y) + radius;
+            kugel[i].pos.z = kugelHoehe(kugel[i].pos.y, height, sizey, radius) + radius;
 
             drawKugel(radius,kugel[i].pos.x,kugel[i].pos.y,kugel[i].pos.z);
 
@@ -449,10 +474,6 @@ void OGLWidget::paintGL()
                     const float impulserhaltung = -0.185;
                     kugel[i].dir = (VX2+VS) * impulserhaltung;
                     kugel[j].dir = (VY2+VS) * impulserhaltung;
-
-                    //Tausche Geschwindigkeiten
-                    //kugel[i].dir = kugel[i].dir * kugel[j].dir.norm();
-                    //kugel[j].dir = kugel[j].dir * kugel[i].dir.norm();
 
                     kugel[i].verhakt[j] = true;
                     kugel[j].verhakt[i] = true;

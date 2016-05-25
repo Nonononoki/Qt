@@ -42,6 +42,8 @@ protected:
     int rotz;
     int zoom;       // Zoom factor (0..200, 100 for 1:1)
 
+    float radius;
+
     float sizex = 10;
     float sizey = 20;
     float height = 2;

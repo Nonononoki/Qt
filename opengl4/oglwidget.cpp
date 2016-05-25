@@ -145,6 +145,8 @@ OGLWidget::OGLWidget(QWidget *parent)
     rotz = 0;
     zoom = 100;
 
+    radius = 1.0f;
+
     //Bänder Zeichnen
     sizex = 10;
     sizey = 20;
@@ -169,6 +171,11 @@ OGLWidget::OGLWidget(QWidget *parent)
 
     for(int i = 0; i < anzKugeln; i++)
     {
+        if(i == 0)
+            kugel[i] = Kugel(0.7f, radius); //gewicht für meine Kugel
+        else
+            kugel[i] = Kugel(0.3f, radius);
+
         kugel[i].pos = start[i];
     }
 
@@ -179,8 +186,8 @@ OGLWidget::OGLWidget(QWidget *parent)
     float zhoehe = height2;
     float zradius = 1;
 
-    zylinder[0] = Zylinder(Vector(sizex,0,0), zradius,zhoehe);
-    zylinder[1] = Zylinder(Vector(-sizex,0,0), zradius,zhoehe);
+    zylinder[0] = Zylinder(Vector(sizex,0.0f,0), zradius,zhoehe);
+    zylinder[1] = Zylinder(Vector(-sizex,0.0f,0), zradius,zhoehe);
     zylinder[2] = Zylinder(Vector(sizex,sizey,0), zradius,zhoehe);
     zylinder[3] = Zylinder(Vector(-sizex,sizey,0), zradius,zhoehe);
     zylinder[4] = Zylinder(Vector(sizex,-sizey,0), zradius,zhoehe);
@@ -254,9 +261,7 @@ void reibung(Vector &dir, Vector pos, float anfang, float ende)
         {
             dir.y = 0;
         }
-    }
-    else
-        qDebug() << "SChräge!";
+    }        
 }
 
 float kugelHoehe(float y, float hoehe, float sizey, float radius)
@@ -387,6 +392,7 @@ void OGLWidget::paintGL()
     drawGround(sizex, -5*part, -3*part, 0, 0);
 
 
+    //Zylinder zeichnen
     for(int i = 0; i < anzZylinder; i++)
     {
         glPushMatrix();
@@ -401,139 +407,171 @@ void OGLWidget::paintGL()
 
     const float speed = 0.001 * 1.3f;
     //const float ebenenKonst = 0.01;
-    float radius = 1;
+    //float radius = 1;
 
     //Kugel Objects
     for(int i = 0; i < anzKugeln; i++)
     {
-        glPushMatrix();
 
-            if(i == 0)
-                glColor3f(0,0,1);
-            else
-                glColor3f(1,0,0);
+         if(kugel[i].del == false || i == 0)
+         {
+             glPushMatrix();
 
-            if( i == 0 && uppos.x() != 0 && uppos.y() != 0)
-            {
-                kugel[i].dir.x = (float)(uppos.x() - lastpos.x()) * speed;
-                kugel[i].dir.y = -(uppos.y() - lastpos.y()) * speed;
+                if(i == 0)
+                    glColor3f(0,0,1);
+                else
+                    glColor3f(1,0,0);
 
-                uppos.setX(0);
-                uppos.setY(0);
-            }
-
-            //Schräge
-            for(int j = 0; j < anzSchraege; j++)
-            {
-                if(kugel[i].pos.y < schraege[j].anfang && kugel[i].pos.y > schraege[j].ende)
+                if( i == 0 && uppos.x() != 0 && uppos.y() != 0)
                 {
-                    kugel[i].dir.y += schraege[j].sconst;
+                    kugel[i].dir.x = (float)(uppos.x() - lastpos.x()) * speed;
+                    kugel[i].dir.y = -(uppos.y() - lastpos.y()) * speed;
+
+                    uppos.setX(0);
+                    uppos.setY(0);
                 }
-            }
 
-            kugel[i].pos.x += kugel[i].dir.x;
-            kugel[i].pos.y += kugel[i].dir.y;
-            kugel[i].pos.z = kugelHoehe(kugel[i].pos.y, height, sizey, radius) + radius;
+                //Schräge
+                for(int j = 0; j < anzSchraege; j++)
+                {
+                    if(kugel[i].pos.y < schraege[j].anfang && kugel[i].pos.y > schraege[j].ende)
+                    {
+                        kugel[i].dir.y += schraege[j].sconst;
+                    }
+                }
 
-            drawKugel(radius,kugel[i].pos.x,kugel[i].pos.y,kugel[i].pos.z);
+                kugel[i].pos.x += kugel[i].dir.x;
+                kugel[i].pos.y += kugel[i].dir.y;
+                kugel[i].pos.z = kugelHoehe(kugel[i].pos.y, height, sizey, radius) + radius;
 
-        glPopMatrix();
+                drawKugel(radius,kugel[i].pos.x,kugel[i].pos.y,kugel[i].pos.z);
+
+            glPopMatrix();
+         }
     }
 
     //Kollision der Kugel
     for(int j = 0; j < anzKugeln; j++)
     {
-        for(int i = 0; i < anzKugeln; i++)
+        if(kugel[j].del == false || j == 0)
         {
-            //float abstand = sqrt((x-x2)*(x-x2) + (y-y2)*(y-y2));
-            float abstand = sqrt(pow(kugel[i].pos.x-kugel[j].pos.x,2) + pow(kugel[i].pos.y-kugel[j].pos.y,2));
-            float margin = 0.01f; //Damit die Kugeln nicht ineinander gehen, margin error
 
-            if(i != j)
+            //Kollision mit anderen Kugeln
+            for(int i = 0; i < anzKugeln; i++)
             {
-                //Kollision der Kugeln
-                if(abstand <= radius*2 + margin && kugel[i].verhakt[j] == false)
+                float abstand = sqrt(pow(kugel[i].pos.x-kugel[j].pos.x,2) + pow(kugel[i].pos.y-kugel[j].pos.y,2));
+                float margin = 0.01f; //Damit die Kugeln nicht ineinander gehen, margin error
+
+                if(i != j && kugel[i].del == false)
                 {
-                    //do something
+                    //Kollision der Kugeln
+                    if(abstand <= radius*2 + margin && kugel[i].verhakt[j] == false)
+                    {
+                        //do something
 
-                    Vector X = kugel[i].pos;
-                    Vector Y = kugel[j].pos;
-                    Vector a = X-Y;
-                    Vector VX = kugel[i].dir;
-                    Vector VY = kugel[j].dir;
+                        Vector X = kugel[i].pos;
+                        Vector Y = kugel[j].pos;
+                        Vector a = X-Y;
+                        Vector VX = kugel[i].dir;
+                        Vector VY = kugel[j].dir;
 
-                    //Vector S = 0.5f * (X-Y) ;
-                    Vector VS = 0.5f *(VX+VY);
+                        //Vector S = 0.5f * (X-Y) ;
+                        Vector VS = ((float)(kugel[i].masse)*VX+(float)(kugel[j].masse)*VY);
 
-                    Vector VX1 = VX-VS;
-                    Vector VY1 = VY-VS;
+                        Vector VX1 = VX-VS;
+                        Vector VY1 = VY-VS;
 
-                    Vector VX2 = 2.0f * ((a*VX1) / a.norm()*a.norm()) * a;
-                    Vector VY2 = 2.0f * ((a*VY1) / a.norm()*a.norm()) * a;                 
+                        Vector VX2 = 2.0f * ((a*VX1) / a.norm()*a.norm()) * a;
+                        Vector VY2 = 2.0f * ((a*VY1) / a.norm()*a.norm()) * a;
 
-                    const float impulserhaltung = -0.185;
-                    kugel[i].dir = (VX2+VS) * impulserhaltung;
-                    kugel[j].dir = (VY2+VS) * impulserhaltung;
+                        const float impulserhaltung = -0.185;
+                        kugel[i].dir = (VX2+VS) * impulserhaltung;
+                        kugel[j].dir = (VY2+VS) * impulserhaltung;
 
-                    kugel[i].verhakt[j] = true;
-                    kugel[j].verhakt[i] = true;
+                        kugel[i].verhakt[j] = true;
+                        kugel[j].verhakt[i] = true;
+                    }
+                }
+
+                //enthaken
+                if(kugel[i].verhakt[j] == true && abstand > radius*2)
+                {
+                    kugel[i].verhakt[j] = false;
                 }
             }
 
-            //enthaken
-            if(kugel[i].verhakt[j] == true && abstand > radius*2)
+            //reibung
+            for(int k = 0; k < anzSchraege && kugel[j].del == false; k++)
             {
-                kugel[i].verhakt[j] = false;
+                reibung(kugel[j].dir, kugel[j].pos, schraege[k].anfang, schraege[k].ende);
+            }
+
+            //Kollision mit Zylindern
+            for(int k = 0; k < anzZylinder && kugel[j].del == false; k++)
+            {
+                Vector vec;
+                float abstand;
+
+                if (k <= 1) //Zylinder in der Mitte
+                    vec = Vector(zylinder[k].pos - kugel[j].pos) + Vector(0,0,radius+height);
+                else
+                    vec = Vector(zylinder[k].pos - kugel[j].pos) + Vector(0,0,radius);
+
+                abstand = vec.norm() - zylinder[k].radius - kugel[j].radius;
+
+                if(abstand <= 0 && j != 0) //Lösche normale Kugeln
+                {
+                    kugel[j].del = true;
+                }
+                else if(abstand <= 0 && j == 0) //resette meine Kugel
+                {
+                    kugel[j].pos = Vector(0,0,0);
+                    kugel[j].dir = Vector(0,0,0);
+                }
             }
         }
+    }
 
-        //Kollisionsüberprüfung Rand
-        for(int i = 0; i < anzKugeln; i++)
+    //Kollisionsüberprüfung Rand
+    for(int i = 0; i < anzKugeln; i++)
+    {
+        if(kugel[i].pos.x-radius <= -sizex && kugel[i].randVerhakt[0] == false)
         {
-            if(kugel[i].pos.x-radius <= -sizex && kugel[i].randVerhakt[0] == false)
-            {
-                kugel[i].dir.x = -kugel[i].dir.x;
-                kugel[i].randVerhakt[0] = true;
-            }
-            if (kugel[i].pos.x +radius>= sizex && kugel[i].randVerhakt[1] == false)
-            {
-                kugel[i].dir.x = -kugel[i].dir.x;
-                kugel[i].randVerhakt[1] = true;
-            }
-            if(kugel[i].pos.y-radius <= -sizey && kugel[i].randVerhakt[2] == false)
-            {
-                kugel[i].dir.y = -kugel[i].dir.y;
-                kugel[i].randVerhakt[2] = true;
-            }
-            if (kugel[i].pos.y+radius >= sizey && kugel[i].randVerhakt[3] == false)
-            {
-                kugel[i].dir.y = -kugel[i].dir.y;
-                kugel[i].randVerhakt[3] = true;
-            }
-
-            //enthaken
-            if(kugel[i].pos.x-radius > -sizex)
-            {
-                kugel[i].randVerhakt[0] = false;
-            }
-            if (kugel[i].pos.x +radius < sizex)
-            {
-                kugel[i].randVerhakt[1] = false;
-            }
-            if(kugel[i].pos.y-radius > -sizey)
-            {
-                kugel[i].randVerhakt[2] = false;
-            }
-            if (kugel[i].pos.y+radius < sizey)
-            {
-                kugel[i].randVerhakt[3] = false;
-            }
+            kugel[i].dir.x = -kugel[i].dir.x;
+            kugel[i].randVerhakt[0] = true;
+        }
+        if (kugel[i].pos.x +radius>= sizex && kugel[i].randVerhakt[1] == false)
+        {
+            kugel[i].dir.x = -kugel[i].dir.x;
+            kugel[i].randVerhakt[1] = true;
+        }
+        if(kugel[i].pos.y-radius <= -sizey && kugel[i].randVerhakt[2] == false)
+        {
+            kugel[i].dir.y = -kugel[i].dir.y;
+            kugel[i].randVerhakt[2] = true;
+        }
+        if (kugel[i].pos.y+radius >= sizey && kugel[i].randVerhakt[3] == false)
+        {
+            kugel[i].dir.y = -kugel[i].dir.y;
+            kugel[i].randVerhakt[3] = true;
         }
 
-        //reibung#
-        for(int k = 0; k < anzSchraege; k++)
+        //enthaken
+        if(kugel[i].pos.x-radius > -sizex)
         {
-            reibung(kugel[j].dir, kugel[j].pos, schraege[k].anfang, schraege[k].ende);
+            kugel[i].randVerhakt[0] = false;
+        }
+        if (kugel[i].pos.x +radius < sizex)
+        {
+            kugel[i].randVerhakt[1] = false;
+        }
+        if(kugel[i].pos.y-radius > -sizey)
+        {
+            kugel[i].randVerhakt[2] = false;
+        }
+        if (kugel[i].pos.y+radius < sizey)
+        {
+            kugel[i].randVerhakt[3] = false;
         }
     }
 
